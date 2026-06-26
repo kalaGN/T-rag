@@ -11,11 +11,12 @@
 - 将向量库写入本地 Qdrant
 - 通过 `query` 命令做融合检索，返回命中的文档块和元数据
 - 通过 `ask` 命令走 CitationQueryEngine 做带引用问答
+- 通过 HTTP API 提供健康检查和问答接口
+- 通过 Gradio 页面提供最小可用问答入口
 
 当前未接入：
 
-- Workflow 三道闸
-- Web API 和前端页面
+- 问答历史/反馈持久化
 
 ## 2. 环境准备
 
@@ -226,13 +227,68 @@ PYTHONPATH=src .venv/bin/python -m fin_rag.cli ask "账期切换逻辑是什么"
 - `target/**`
 - `.git/**`
 
-## 10. 常见问题
+## 10. HTTP API
 
-### 10.1 `query` 报错找不到 collection
+启动命令：
+
+```bash
+PYTHONPATH=src .venv/bin/python -m fin_rag.cli serve-api
+```
+
+自定义监听地址：
+
+```bash
+PYTHONPATH=src .venv/bin/python -m fin_rag.cli serve-api --host 0.0.0.0 --port 8010
+```
+
+当前接口：
+
+- `GET /healthz`
+- `POST /ask`
+
+`POST /ask` 请求示例：
+
+```json
+{
+  "question": "账期切换逻辑是什么",
+  "domains": ["fin-online"]
+}
+```
+
+返回字段与 CLI `ask` 一致：
+
+- `answer`
+- `sources`
+- `refused`
+- `validation`
+
+## 11. Gradio 页面
+
+启动命令：
+
+```bash
+PYTHONPATH=src .venv/bin/python -m fin_rag.cli serve-web
+```
+
+自定义监听地址：
+
+```bash
+PYTHONPATH=src .venv/bin/python -m fin_rag.cli serve-web --host 0.0.0.0 --port 7860
+```
+
+页面当前提供：
+
+- 问题输入
+- `fin-online` / `opdata` 业务域过滤
+- 回答、来源、校验结果展示
+
+## 12. 常见问题
+
+### 12.1 `query` 报错找不到 collection
 
 先重新执行 `index`。
 
-### 10.2 `index` 能跑完，但 `node_count` 为 0
+### 12.2 `index` 能跑完，但 `node_count` 为 0
 
 通常表示没有生成 embedding 或没有把节点写进 Qdrant。先确认：
 
@@ -240,7 +296,7 @@ PYTHONPATH=src .venv/bin/python -m fin_rag.cli ask "账期切换逻辑是什么"
 - `embedding_base_url` 配置正确
 - Qdrant 服务可访问
 
-### 10.3 `query` 没有返回结果
+### 12.3 `query` 没有返回结果
 
 先检查：
 
@@ -248,7 +304,7 @@ PYTHONPATH=src .venv/bin/python -m fin_rag.cli ask "账期切换逻辑是什么"
 - `--domain` 是否过滤过窄
 - `index` 是否刚刚成功写入
 
-## 11. 建议的运行顺序
+## 13. 建议的运行顺序
 
 ```bash
 1. 启动 Qdrant

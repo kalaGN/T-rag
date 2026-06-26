@@ -9,6 +9,8 @@ description = "Knowledge assistant for fin-online and opdata documents"
 readme = "docs/design/2026-06-24-fin-rag-design.md"
 requires-python = ">=3.11"
 dependencies = [
+  "fastapi>=0.115,<1",
+  "gradio>=5.9,<6",
   "llama-index-core==0.12.52.post1",
   "llama-index-vector-stores-qdrant==0.4.3",
   "llama-index-embeddings-openai-like==0.2.0",
@@ -19,6 +21,7 @@ dependencies = [
   "openpyxl>=3.1,<4",
   "pypdf>=5.0,<6",
   "sentence-transformers>=3.0,<4",
+  "uvicorn>=0.32,<1",
 ]
 
 [project.optional-dependencies]

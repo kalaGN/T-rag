@@ -5,6 +5,7 @@ import json
 import logging
 from pathlib import Path
 
+from fin_rag.api.app import serve_api
 from fin_rag.config import Settings, load_sources
 from fin_rag.embedding_service import serve as serve_embedding_service
 from fin_rag.ingestion.documents import collect_loaded_documents, to_llama_documents
@@ -12,6 +13,7 @@ from fin_rag.ingestion.llama_pipeline import run_llama_index
 from fin_rag.ingestion.pipeline import build_index_plan
 from fin_rag.retrieval.fusion import build_query_bundle, build_vector_retriever
 from fin_rag.qa.workflow import ask_question
+from fin_rag.web.app import serve_web
 
 
 def _configure_logging() -> None:
@@ -31,6 +33,14 @@ def main() -> None:
     index_parser.add_argument("--dry-run", action="store_true", help="Only scan and summarize documents")
     embedding_parser = subparsers.add_parser("serve-embeddings", help="Run the local embedding service")
     embedding_parser.add_argument("--settings", type=Path, help="Override settings yaml")
+    api_parser = subparsers.add_parser("serve-api", help="Run the HTTP API server")
+    api_parser.add_argument("--settings", type=Path, help="Override settings yaml")
+    api_parser.add_argument("--host", default="127.0.0.1", help="Bind host")
+    api_parser.add_argument("--port", type=int, default=8010, help="Bind port")
+    web_parser = subparsers.add_parser("serve-web", help="Run the Gradio web app")
+    web_parser.add_argument("--settings", type=Path, help="Override settings yaml")
+    web_parser.add_argument("--host", default="127.0.0.1", help="Bind host")
+    web_parser.add_argument("--port", type=int, default=7860, help="Bind port")
     query_parser = subparsers.add_parser("query", help="Run a real query against the built index")
     query_parser.add_argument("question", help="User question")
     query_parser.add_argument("--settings", type=Path, help="Override settings yaml")
@@ -74,6 +84,20 @@ def main() -> None:
     if args.command == "serve-embeddings":
         settings = Settings.from_yaml(args.settings)
         serve_embedding_service(settings)
+        return
+
+    if args.command == "serve-api":
+        try:
+            serve_api(args.settings, host=args.host, port=args.port)
+        except RuntimeError as exc:
+            raise SystemExit(str(exc)) from exc
+        return
+
+    if args.command == "serve-web":
+        try:
+            serve_web(args.settings, host=args.host, port=args.port)
+        except RuntimeError as exc:
+            raise SystemExit(str(exc)) from exc
         return
 
     if args.command == "query":
