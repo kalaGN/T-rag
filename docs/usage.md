@@ -43,8 +43,11 @@ Qdrant 可以通过 Docker 启动，Embedding 服务通过本仓库 CLI 启动�
 
 默认配置文件：
 
+- [config/settings.example.yaml](/Users/wangfei/yulore/fin-rag/config/settings.example.yaml)
 - [config/settings.yaml](/Users/wangfei/yulore/fin-rag/config/settings.yaml)
 - [config/sources.yaml](/Users/wangfei/yulore/fin-rag/config/sources.yaml)
+
+建议先复制 `config/settings.example.yaml` 为 `config/settings.yaml`，再填入本机的密钥和地址。
 
 常用配置项：
 
