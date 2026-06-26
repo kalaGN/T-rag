@@ -1,6 +1,6 @@
 # fin-rag 设计方案：运营/金融知识库智能问答助手
 
-- **状态**：草案待评审
+- **状态**：实施中（索引、检索与最小 QA 编排已落地）
 - **日期**：2026-06-24
 - **作者**：王飞 + Codex
 - **项目名**：`fin-rag`
@@ -26,10 +26,28 @@
 | 约束 | 取值 |
 |------|------|
 | 形态 | 团队共享 Web 服务（首期 Gradio，二期 Vue） |
-| LLM 与隐私 | 云端国产大模型 API（LLM=DeepSeek，Embedding=智谱 Embedding-3），文档内容会发往云厂商 |
+| LLM 与隐私 | Embedding 使用本地 `BAAI/bge-base-zh-v1.5` 服务，文档全文不发送到第三方向量化厂商；LLM 生成阶段支持 DeepSeek/OpenAI-compatible 服务 |
 | 技术栈 | Python 3.11+ |
 | 检索范围 | 两项目统一索引（全量重建，幂等 `chunk_id`），后续可配置加入其他项目 |
 | 数据源 | 本地文件系统（`docs/` + `.cursor/`） |
+
+### 1.4 当前已落地范围
+
+已完成：
+
+- 本地 Embedding 服务：`BAAI/bge-base-zh-v1.5`
+- Qdrant Docker 独立服务
+- `fin-online` / `opdata` 文档扫描、解析、切分与索引
+- DocStore 持久化与重载
+- 融合检索链路：向量检索 + BM25
+- `fin-rag index` 与 `fin-rag query` CLI
+- `fin-rag ask` CitationQueryEngine 问答入口
+- OpenAI-compatible LLM 包装器（可对接 DeepSeek 等兼容服务）
+
+待接入：
+
+- Web API / Gradio 前端
+- 评测集与自动回归
 
 ---
 
@@ -115,13 +133,13 @@
 | `IngestionPipeline` | 串联清洗、层级切分、元数据提取、向量化、缓存与写库 | LlamaIndex |
 | `HierarchicalNodeParser` | 生成父/子 `TextNode`，小块检索、父块回灌 | LlamaIndex |
 | `BusinessMetadataExtractor` | 自定义 `TransformComponent`，抽取 project/domain/doc_type/产品号/渠道/章节 | LlamaIndex + 正则规则 |
-| `Embedding` | 通过 LlamaIndex OpenAI-compatible Embedding 适配智谱 Embedding-3 | LlamaIndex |
+| `Embedding` | 通过 LlamaIndex 接入本地 `BAAI/bge-base-zh-v1.5` Embedding 服务（HTTP/OpenAI-compatible） | LlamaIndex |
 | `VectorStoreIndex` | 统一索引入口；向量与 metadata 写入 `QdrantVectorStore`，父节点写入 DocStore | LlamaIndex + Qdrant |
 | `QueryFusionRetriever` | 融合向量检索与 BM25 检索，采用 RRF | LlamaIndex |
 | `AutoMergingRetriever` | 命中足够多子节点时回灌父节点，补全上下文 | LlamaIndex |
 | `NodePostprocessor` | domain 过滤、业务权重、BGE 重排和最低相关性门控 | LlamaIndex + 自定义扩展 |
-| `CitationQueryEngine` | 基于检索节点生成带编号引用的答案 | LlamaIndex |
-| `QAWorkflow` | 编排检索、门控、生成、引用校验和错误处理 | LlamaIndex Workflow |
+| `CitationQueryEngine` | 基于检索节点生成带编号引用的答案（待接入） | LlamaIndex |
+| `QAWorkflow` | 编排检索、门控、生成、引用校验和错误处理（待接入） | LlamaIndex Workflow |
 | `WebApp` | API + 前端，问答历史/反馈/业务域筛选 | FastAPI + Gradio |
 
 > **首版不含**（二期随 MySQL 一起加）：`Router`/`DataQueryProvider`（文档/数据路由）和目录监听服务。首版由 `IngestionPipeline + IngestionCache + doc_id` 处理重复与变更；实时监听和删除事件同步留到文档高频更新时再上。
@@ -162,7 +180,7 @@
 | 格式 | 处理策略 |
 |------|---------|
 | `.md` | markdown-it 解析，**保留标题树**作为切分骨架 |
-| `.mdc`（Cursor 规则）⭐ | **剥离 YAML frontmatter**（`description/globs/alwaysApply`）入 metadata；`alwaysApply:true` 的规则（如 anti-hallucination、requirement-to-tech-doc）额外标记，可作**系统提示硬约束注入** |
+| `.mdc`（Cursor 规则）⭐ | **剥离 YAML frontmatter**（`description/globs/alwaysApply`）入 metadata；正文按普通文档入库，用于检索与引用 |
 | `.csv` | 配置/映射类 → 按行成组（表头做字段说明）；**大表（如 9MB 用例模板）→ 仅建摘要索引**，不入全文 |
 | `.xlsx` | 按 sheet 成独立文档，大表抽摘要 + 关键列 |
 | `.pdf` | 页/段切分 |
@@ -240,7 +258,7 @@
 
 1. **为什么必须融合检索**：语义类问题靠 `VectorIndexRetriever`；产品号、PID、渠道和表名等精确标识靠 `BM25Retriever`。由 `QueryFusionRetriever` 做 RRF，避免把 Qdrant 私有查询 API 扩散到业务层。BM25 中文分词效果必须通过 Golden Set 验证；若效果不达标，再切换 Qdrant hybrid/BM42，Retriever 接口不变。
 2. **查询改写**：术语归一化表（账期↔结算周期↔billing cycle、降查得↔降档↔degrade…）——应对"用户口语 vs 文档术语"对不上。多查询展开二期再加。
-3. **业务加权重排**：以自定义 `BaseNodePostprocessor` 实现 metadata 加权，再接 `SentenceTransformerRerank`。`alwaysApply:true` 的规则作硬约束注入，而非普通检索块。
+3. **业务加权重排**：以自定义 `BaseNodePostprocessor` 实现 metadata 加权，再接 `SentenceTransformerRerank`。规则文档与其他文档一样参与检索，不再做默认硬注入。
 4. **domain 过滤（仅筛选不隔离）**：默认全库搜索；前端提供业务域筛选器（fin-online / opdata / 全部）。选定域 → `filter domain in [...]`；未选 → 不带 filter。
 5. **全程引用溯源**：上下文每块带溯源标签 `[domain / 文件路径 / §章节]`。
 
@@ -249,6 +267,8 @@
 ## 7. 问答编排与提示工程（防幻觉 + 溯源）
 
 ### 7.1 编排流程
+
+> 当前仓库已完成索引与检索链路，`query` 命令目前输出检索结果和元数据；本节描述的是下一步要接入的问答编排目标态。
 
 ```
 用户问题 + 历史
@@ -277,7 +297,7 @@
 | 闸 | 机制 | 实现 |
 |----|------|------|
 | **① 检索门控** | 召回置信度不足直接拒答 | `SimilarityPostprocessor` + Workflow 条件分支 |
-| **② 生成约束** | 仅依据上下文作答，每条结论带引用 | `CitationQueryEngine` + 自定义 `PromptTemplate` |
+| **② 生成约束** | 仅依据上下文作答，每条结论带引用 | `CitationQueryEngine` + 自定义 `PromptTemplate`（待接入） |
 | **③ 事后校验** | 引用必须来自本次 `source_nodes`，产品号/数字与原文一致 | Workflow 自定义校验 Step；失败则拒答或重生成一次 |
 
 ### 7.3 系统提示骨架（防幻觉 + 溯源 + 中文金融口吻）
@@ -310,7 +330,7 @@
 | 召回不足（门控触发） | 拒答 + 给"相近问题/可补充文档"建议 |
 | LLM 编造引用 | 事后校验拦截，标记 `低置信` 或重生成 |
 | 超长答案 | 分段 + 结构化（结论先行 + 详情折叠） |
-| LLM/Embedding API 失败 | 重试 + 降级（备用模型/本地小模型兜底） |
+| LLM/Embedding API 失败 | LLM 调用重试；本地 Embedding 服务不可用时阻断索引/检索并告警，不回退到云端 Embedding |
 
 ---
 
@@ -322,11 +342,11 @@
 |----|------|------|
 | 语言 | Python 3.11+ | 生态成熟，已选定 |
 | RAG 框架 | **LlamaIndex** | Reader、IngestionPipeline、NodeParser、Index、Retriever、QueryEngine、Workflow 全链路统一 |
-| 向量库 | **Qdrant**（首期 `qdrant-local` 嵌入式零运维；二期 docker） | 原生支持 dense+sparse 混合检索 + RRF |
-| Embedding | **智谱 Embedding-3**（OpenAI 兼容，可切本地兜底） | 中文强；256/512/1024/2048 可选（首版 1024 维）；仅稠密向量 |
+| 向量库 | **Qdrant**（首版即使用 Docker 独立服务） | 与团队共享部署形态一致，便于持久化、排障和后续迁移到内网服务器；原生支持 dense+sparse 混合检索 + RRF |
+| Embedding | **`BAAI/bge-base-zh-v1.5` 本地服务**（OpenAI-compatible HTTP 接口） | 768 维，中文检索效果与资源占用平衡较好；适合当前 `Apple M1 Pro / 16GB` 机器先落地，文档不出本机/内网 |
 | 重排 | **BGE-Reranker-v2-m3** | 中文精排强 |
 | 稀疏检索 | **LlamaIndex BM25Retriever**（首版） | 与 `QueryFusionRetriever` 原生组合；效果不足可替换为 Qdrant hybrid/BM42 |
-| LLM | **DeepSeek**（LlamaIndex DeepSeek 或 OpenAI-compatible 集成） | 国产云端 API，符合隐私约束；与 Embedding 分属不同厂商 |
+| LLM | **DeepSeek**（LlamaIndex DeepSeek 或 OpenAI-compatible 集成） | 仅答案生成走云端；Embedding 留在本地，降低文档外发范围 |
 | 后端 | FastAPI + Pydantic | API + 输入校验 |
 | 前端 | 首期 **Gradio**（`ChatInterface` 原生多轮对话 + 流式，溯源/反馈用自定义组件补），二期 Vue | RAG 聊天形态 Gradio 比 Streamlit 更省事（多轮/流式开箱即用） |
 | 测试 | pytest，**目标 ≥80%** | 对应测试规范 |
@@ -352,8 +372,8 @@ fin-rag/
 │   │   └── postprocessors.py  # 门控 + 业务加权 + BGE 重排
 │   ├── qa/                    # ── 问答编排
 │   │   ├── prompts.py         # 系统提示(防幻觉硬约束)
-│   │   ├── citation.py        # CitationQueryEngine 构建与引用校验
-│   │   └── workflow.py        # LlamaIndex Workflow 编排三道闸
+│   │   ├── citation.py        # 引用上下文与引用校验
+│   │   └── workflow.py        # LlamaIndex Workflow 编排三道闸（待接入）
 │   ├── store/                 # ── 存储
 │   │   ├── qdrant.py          # QdrantVectorStore/StorageContext 工厂
 │   │   └── metadata_store.py  # SQLite: 反馈/问答历史
@@ -408,26 +428,35 @@ sources:
 
 ### 8.5 配置变更清单
 
-- `pyproject.toml`：增加 LlamaIndex core、Qdrant、BM25、reranker、DeepSeek/OpenAI-compatible、embedding 等按需拆分包；版本必须锁定。
-- `config/settings.yaml`：增加 `chunk_sizes`、`similarity_cutoff`、`fusion_top_k`、`rerank_top_n`、`ingestion_cache_path`、`docstore_path`。
-- 环境变量：`DEEPSEEK_API_KEY`、`ZHIPU_API_KEY`、`QDRANT_URL`，禁止写入配置文件。
+- `pyproject.toml`：增加 LlamaIndex core、Qdrant、BM25、reranker、DeepSeek/OpenAI-compatible、local embedding client 等按需拆分包；版本必须锁定。
+- `config/settings.yaml`：增加 `chunk_sizes`、`similarity_cutoff`、`fusion_top_k`、`rerank_top_n`、`ingestion_cache_path`、`docstore_path`、`llm_base_url`、`llm_model`、`llm_api_key`、`llm_timeout`、`llm_max_tokens`、`llm_temperature`。
+- 环境变量：`DEEPSEEK_API_KEY`、`QDRANT_URL`、`EMBEDDING_BASE_URL`、`EMBEDDING_MODEL`（如服务鉴权则再加 `EMBEDDING_API_KEY`），禁止写入配置文件。
+
+建议默认值：
+
+- `EMBEDDING_MODEL=BAAI/bge-base-zh-v1.5`
+- `EMBEDDING_DIM=768`
+- `EMBEDDING_BATCH_SIZE=8`（本机 `M1 Pro 16GB` 起步值；离线全量索引可视负载逐步调到 16）
 
 ### 8.6 代码变更清单
 
-- 删除自建 `Document/Node`、手写 embedding client、手写 Qdrant RRF 查询和自建 `QAChain` 的设计。
-- 新增 LlamaIndex Reader、TransformComponent、IngestionPipeline、StorageContext、Retriever、NodePostprocessor、CitationQueryEngine 和 Workflow 工厂。
+- 删除自建 `Document/Node`、手写 Qdrant RRF 查询和自建 `QAChain` 的设计。
+- 新增 LlamaIndex Reader、TransformComponent、IngestionPipeline、StorageContext、Retriever、NodePostprocessor、CitationQueryEngine、OpenAI-compatible LLM 工厂和 Workflow 工厂。
 - 业务自定义代码仅保留：采集排除、格式清洗、metadata 规则、术语归一化、门控策略、业务加权、引用真实性校验。
 
 ### 8.7 风险与兼容性
 
 - LlamaIndex 包拆分多、API 迭代快：锁定依赖版本，升级必须跑 Golden Set。
+- 本地 Embedding 服务需要稳定暴露统一维度和模型版本；模型切换或维度变化必须触发全量重建索引。
+- 本地 Embedding 吞吐受机器资源影响明显；批量索引时需限制并发和 batch size，避免把 CPU/GPU 打满影响在线问答。
+- `BAAI/bge-base-zh-v1.5` 适合当前单机开发与小规模团队试用；若后续文档规模明显扩大或并发升高，再升级到更强模型或把 Embedding 服务拆到独立机器。
 - `BM25Retriever` 需要可加载全部叶子节点；当前数百文档可接受，规模扩大后切 Qdrant hybrid/BM42。
 - `AutoMergingRetriever` 依赖 DocStore 中存在父节点；索引与检索必须共享同一 StorageContext。
 - 现有 M0-M5 实施计划基于自建组件，与本方案不兼容，已标记废弃，编码前需按本方案重新拆分。
 
 ### 8.8 部署
 
-Docker Compose（`qdrant` + `app`），团队共享一个内网 URL；配置与索引数据卷持久化；API key 走环境变量（**绝不入库/硬编码**）。
+首版统一采用 Docker Compose 部署 `qdrant` + `app`，开发、测试、内网部署保持同构；默认通过 `QDRANT_URL=http://localhost:6333` 连接独立 Qdrant 服务。配置与索引数据卷持久化；API key 走环境变量（**绝不入库/硬编码**）。
 
 ### 8.9 里程碑
 
@@ -454,7 +483,6 @@ Docker Compose（`qdrant` + `app`），团队共享一个内网 URL；配置与�
 
 ## 10. 开放问题（评审确认）
 
-1. ~~Embedding/LLM 具体用哪家云端~~ **已定**：LLM=DeepSeek、Embedding=智谱 Embedding-3（首版 1024 维）；稀疏路首版用 LlamaIndex `BM25Retriever`
+1. ~~Embedding/LLM 具体用哪家云端~~ **已定**：Embedding=`BAAI/bge-base-zh-v1.5` 本地服务（768 维，索引建库后不可随意变更）；LLM 生成支持 DeepSeek/OpenAI-compatible；稀疏路首版用 LlamaIndex `BM25Retriever`
 2. 首版部署目标机器（内网服务器 IP/资源）—— 影响 Docker 部署形态
 3. Golden Set 的标注人力来源 —— 评测质量依赖
-4. `alwaysApply:true` 规则默认作为硬约束注入；评审只需确认注入范围和 token 上限

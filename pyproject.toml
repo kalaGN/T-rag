@@ -1,0 +1,37 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "fin-rag"
+version = "0.1.0"
+description = "Knowledge assistant for fin-online and opdata documents"
+readme = "docs/design/2026-06-24-fin-rag-design.md"
+requires-python = ">=3.11"
+dependencies = [
+  "llama-index-core==0.12.52.post1",
+  "llama-index-vector-stores-qdrant==0.4.3",
+  "llama-index-embeddings-openai-like==0.2.0",
+  "llama-index-retrievers-bm25==0.5.2",
+  "qdrant-client==1.18.0",
+  "PyYAML>=6.0,<7",
+  "markdown-it-py>=3.0,<4",
+  "openpyxl>=3.1,<4",
+  "pypdf>=5.0,<6",
+  "sentence-transformers>=3.0,<4",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3,<9",
+]
+
+[project.scripts]
+fin-rag = "fin_rag.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fin_rag"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

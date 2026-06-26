@@ -1,0 +1,24 @@
+sources:
+  - name: fin-online
+    root: /Users/wangfei/yulore/fin-online.dianhua.cn
+    include:
+      - docs
+      - .cursor
+    exclude_patterns:
+      - "*bxf*"
+      - "docs/testcase/**"
+      - "docs/review/**"
+      - ".DS_Store"
+      - "target/**"
+      - ".git/**"
+    default_domain: fin-online
+  - name: opdata
+    root: /Users/wangfei/yulore/opdata.dianhua.cn
+    include:
+      - docs
+      - .cursor
+    exclude_patterns:
+      - ".DS_Store"
+      - "target/**"
+      - ".git/**"
+    default_domain: opdata
