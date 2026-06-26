@@ -10,7 +10,7 @@ def create_app(settings_path: Path | None = None):
     try:
         from fastapi import Body, FastAPI, HTTPException
     except ModuleNotFoundError as exc:
-        raise RuntimeError("FastAPI is not installed.") from exc
+        raise RuntimeError("FastAPI is not installed. Run ./.venv/bin/pip install -e '.[dev]' first.") from exc
 
     settings = Settings.from_yaml(settings_path)
     app = FastAPI(title="fin-rag")
@@ -53,6 +53,6 @@ def serve_api(
     try:
         import uvicorn
     except ModuleNotFoundError as exc:
-        raise RuntimeError("uvicorn is not installed.") from exc
+        raise RuntimeError("uvicorn is not installed. Run ./.venv/bin/pip install -e '.[dev]' first.") from exc
 
     uvicorn.run(create_app(settings_path), host=host, port=port)

@@ -11,7 +11,7 @@ def create_web_app(settings_path: Path | None = None):
     try:
         import gradio as gr
     except ModuleNotFoundError as exc:
-        raise RuntimeError("gradio is not installed.") from exc
+        raise RuntimeError("gradio is not installed. Run ./.venv/bin/pip install -e '.[dev]' first.") from exc
 
     settings = Settings.from_yaml(settings_path)
 
