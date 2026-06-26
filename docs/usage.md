@@ -31,7 +31,50 @@ python3 -m venv .venv
 .venv/bin/pip install -e .[dev]
 ```
 
-### 2.2 本地服务
+### 2.2 启动脚本
+
+一键开发脚本是 [scripts/dev.sh](/Users/wangfei/yulore/fin-rag/scripts/dev.sh)。
+它会自动检查并启动 Qdrant、后台拉起 embedding，然后前台启动 `web` 或 `api`。
+
+默认启动完整开发环境并打开 Gradio：
+
+```bash
+scripts/dev.sh
+```
+
+启动 API 开发环境：
+
+```bash
+scripts/dev.sh api --host 0.0.0.0 --port 8010
+```
+
+统一入口脚本是 [scripts/start.sh](/Users/wangfei/yulore/fin-rag/scripts/start.sh)。
+它只启动单个模式，不负责联动拉起依赖服务。
+
+仓库新增了统一入口脚本 [scripts/start.sh](/Users/wangfei/yulore/fin-rag/scripts/start.sh)。
+
+默认启动 Gradio 页面：
+
+```bash
+scripts/start.sh
+```
+
+常用示例：
+
+```bash
+scripts/start.sh api --host 0.0.0.0 --port 8010
+scripts/start.sh embeddings
+scripts/start.sh index
+scripts/start.sh ask "账期切换逻辑是什么"
+```
+
+可选环境变量：
+
+- `PYTHON_BIN`
+- `SETTINGS_PATH`
+- `SOURCES_PATH`
+
+### 2.3 本地服务
 
 需要先启动两个本地服务：
 
