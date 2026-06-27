@@ -33,7 +33,10 @@ def create_web_app(settings_path: Path | None = None):
             cleaned_question = question.strip()
             if not cleaned_question:
                 return "请输入问题。", [], {"valid": False, "error": "question is required"}
-            result = ask_question(settings, cleaned_question, domains=domains or None)
+            try:
+                result = ask_question(settings, cleaned_question, domains=domains or None)
+            except RuntimeError as exc:
+                return f"问答失败：{exc}", [], {"valid": False, "error": str(exc)}
             return result.answer, result.sources, result.validation
 
         submit_button.click(

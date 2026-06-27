@@ -1,12 +1,19 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from fin_rag.config import Settings
 from fin_rag.llm import build_llm
 from fin_rag.qa.citation import CitationContext, validate_citations
 from fin_rag.qa.prompts import REFUSAL_TEMPLATE
 from fin_rag.retrieval.query_engine import build_query_engine
+
+# 短查询相似度阈值：查询越短，语义信息越少，需要降低阈值放宽检索条件。
+# 字符数为去除空白后的长度，阈值取 min(default, limit) 确保不会超过配置的默认值。
+_SHORT_QUERY_CUTOFF_TINY = 0.15   # <=2 字符 (如 "ab", "账期")
+_SHORT_QUERY_CUTOFF_SHORT = 0.20  # <=4 字符 (如 "账期切换")
+_SHORT_QUERY_CUTOFF_MEDIUM = 0.30  # <=8 字符 (如 "账期切换逻辑是什么")
 
 
 @dataclass(slots=True)
@@ -56,7 +63,7 @@ def ask_question(settings: Settings, question: str, domains: list[str] | None = 
         answer=answer,
         sources=[
             {
-                "score": node.score,
+                "score": getattr(node, "score", None),
                 "text": node.node.text[:400],
                 "metadata": node.node.metadata,
             }
@@ -68,7 +75,7 @@ def ask_question(settings: Settings, question: str, domains: list[str] | None = 
     )
 
 
-def _build_citation_contexts(source_nodes) -> list[CitationContext]:
+def _build_citation_contexts(source_nodes: list[Any]) -> list[CitationContext]:
     contexts: list[CitationContext] = []
     for index, node in enumerate(source_nodes, start=1):
         metadata = node.node.metadata or {}
@@ -87,18 +94,18 @@ def _build_citation_contexts(source_nodes) -> list[CitationContext]:
 def _resolve_similarity_cutoff(question: str, default_cutoff: float) -> float:
     normalized = "".join(question.split())
     if len(normalized) <= 2:
-        return min(default_cutoff, 0.15)
+        return min(default_cutoff, _SHORT_QUERY_CUTOFF_TINY)
     if len(normalized) <= 4:
-        return min(default_cutoff, 0.2)
+        return min(default_cutoff, _SHORT_QUERY_CUTOFF_SHORT)
     if len(normalized) <= 8:
-        return min(default_cutoff, 0.3)
+        return min(default_cutoff, _SHORT_QUERY_CUTOFF_MEDIUM)
     return default_cutoff
 
 
 @dataclass(slots=True)
 class _QueryRunResult:
     answer: str
-    source_nodes: list[object]
+    source_nodes: list[Any]
     source_contexts: list[CitationContext]
     validation: dict[str, object]
 
@@ -107,7 +114,7 @@ def _run_query(
     settings: Settings,
     question: str,
     domains: list[str] | None,
-    llm,
+    llm: Any,
     similarity_cutoff: float | None,
 ) -> _QueryRunResult:
     node_postprocessors = []

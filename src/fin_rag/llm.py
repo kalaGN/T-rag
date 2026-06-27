@@ -184,7 +184,12 @@ def build_llm(settings: Settings):
 
 
 def _normalize_api_base(api_base: str) -> str:
+    from urllib.parse import urlparse, urlunparse
+
     normalized = api_base.rstrip("/")
-    if normalized.endswith("/v1"):
+    parsed = urlparse(normalized)
+    path = parsed.path.rstrip("/")
+    if path.endswith("/v1"):
         return normalized
-    return f"{normalized}/v1"
+    new_path = f"{path}/v1" if path else "/v1"
+    return urlunparse(parsed._replace(path=new_path))

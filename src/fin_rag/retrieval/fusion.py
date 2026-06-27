@@ -33,16 +33,15 @@ def build_vector_retriever(settings: Settings, domains: list[str] | None = None,
 
 def build_vector_index(settings: Settings):
     try:
-        from llama_index.core import Settings as LlamaSettings
         from llama_index.core.indices.vector_store import VectorStoreIndex
     except ModuleNotFoundError as exc:
         raise RuntimeError(
             "llama-index retrieval dependencies are not installed."
         ) from exc
 
-    LlamaSettings.embed_model = build_embedding(settings)
+    embed_model = build_embedding(settings)
     vector_store = build_qdrant_vector_store(settings)
-    return VectorStoreIndex.from_vector_store(vector_store=vector_store, embed_model=LlamaSettings.embed_model)
+    return VectorStoreIndex.from_vector_store(vector_store=vector_store, embed_model=embed_model)
 
 
 def build_retriever(

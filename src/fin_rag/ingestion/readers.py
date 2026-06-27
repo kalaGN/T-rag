@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import csv
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
 from fin_rag.config import Settings, SourceConfig
 from fin_rag.ingestion.metadata import build_metadata
+
+_FRONTMATTER_PATTERN = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 
 
 @dataclass(slots=True)
@@ -52,15 +55,21 @@ def load_document(
 
 
 def _read_text(path: Path) -> str:
-    raw = path.read_text(encoding="utf-8", errors="ignore")
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.warning("File %s is not valid UTF-8, retrying with errors=ignore", path)
+        raw = path.read_text(encoding="utf-8", errors="ignore")
     if path.suffix.lower() != ".mdc":
         return raw
-    if raw.startswith("---"):
-        parts = raw.split("---", 2)
-        if len(parts) == 3:
-            frontmatter = parts[1].strip()
-            body = parts[2].strip()
-            return f"[frontmatter]\n{frontmatter}\n\n{body}"
+    match = _FRONTMATTER_PATTERN.match(raw)
+    if match:
+        frontmatter = match.group(1).strip()
+        body = raw[match.end():].strip()
+        return f"[frontmatter]\n{frontmatter}\n\n{body}"
     return raw
 
 

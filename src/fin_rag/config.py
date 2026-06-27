@@ -83,7 +83,13 @@ def _apply_env_overrides(data: dict[str, Any]) -> dict[str, Any]:
         env_key = f"FIN_RAG_{key.upper()}"
         if env_key not in os.environ:
             continue
-        merged[key] = caster(os.environ[env_key])
+        raw_value = os.environ[env_key]
+        try:
+            merged[key] = caster(raw_value)
+        except (ValueError, TypeError) as exc:
+            raise ValueError(
+                f"Invalid value for environment variable {env_key}: {raw_value!r}"
+            ) from exc
     return merged
 
 

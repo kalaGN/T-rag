@@ -25,9 +25,8 @@ def _source_node(text: str, score: float = 0.9, domain: str = "fin-online", file
     )
 
 
-def test_ask_question_returns_answer_when_citations_are_valid(monkeypatch):
-    captured = {}
-
+def _install_llama_index_mocks(monkeypatch) -> None:
+    """安装 llama_index 模块 mock，供 workflow 测试共用。"""
     root_module = ModuleType("llama_index")
     root_module.__path__ = []
     core_module = ModuleType("llama_index.core")
@@ -45,6 +44,11 @@ def test_ask_question_returns_answer_when_citations_are_valid(monkeypatch):
     monkeypatch.setitem(sys.modules, "llama_index.core", core_module)
     monkeypatch.setitem(sys.modules, "llama_index.core.indices", indices_module)
     monkeypatch.setitem(sys.modules, "llama_index.core.indices.postprocessor", postprocessor_module)
+
+
+def test_ask_question_returns_answer_when_citations_are_valid(monkeypatch):
+    captured = {}
+    _install_llama_index_mocks(monkeypatch)
 
     def fake_build_llm(settings):
         return object()
@@ -79,23 +83,7 @@ def test_ask_question_returns_answer_when_citations_are_valid(monkeypatch):
 
 
 def test_ask_question_refuses_when_validation_fails(monkeypatch):
-    root_module = ModuleType("llama_index")
-    root_module.__path__ = []
-    core_module = ModuleType("llama_index.core")
-    core_module.__path__ = []
-    indices_module = ModuleType("llama_index.core.indices")
-    indices_module.__path__ = []
-    postprocessor_module = ModuleType("llama_index.core.indices.postprocessor")
-
-    class SimilarityPostprocessor:
-        def __init__(self, **kwargs):
-            self.__dict__.update(kwargs)
-
-    postprocessor_module.SimilarityPostprocessor = SimilarityPostprocessor
-    monkeypatch.setitem(sys.modules, "llama_index", root_module)
-    monkeypatch.setitem(sys.modules, "llama_index.core", core_module)
-    monkeypatch.setitem(sys.modules, "llama_index.core.indices", indices_module)
-    monkeypatch.setitem(sys.modules, "llama_index.core.indices.postprocessor", postprocessor_module)
+    _install_llama_index_mocks(monkeypatch)
 
     def fake_build_llm(settings):
         return object()
@@ -121,24 +109,7 @@ def test_ask_question_refuses_when_validation_fails(monkeypatch):
 
 def test_ask_question_uses_lower_cutoff_for_short_query(monkeypatch):
     captured = {}
-
-    root_module = ModuleType("llama_index")
-    root_module.__path__ = []
-    core_module = ModuleType("llama_index.core")
-    core_module.__path__ = []
-    indices_module = ModuleType("llama_index.core.indices")
-    indices_module.__path__ = []
-    postprocessor_module = ModuleType("llama_index.core.indices.postprocessor")
-
-    class SimilarityPostprocessor:
-        def __init__(self, **kwargs):
-            self.__dict__.update(kwargs)
-
-    postprocessor_module.SimilarityPostprocessor = SimilarityPostprocessor
-    monkeypatch.setitem(sys.modules, "llama_index", root_module)
-    monkeypatch.setitem(sys.modules, "llama_index.core", core_module)
-    monkeypatch.setitem(sys.modules, "llama_index.core.indices", indices_module)
-    monkeypatch.setitem(sys.modules, "llama_index.core.indices.postprocessor", postprocessor_module)
+    _install_llama_index_mocks(monkeypatch)
 
     monkeypatch.setattr("fin_rag.qa.workflow.build_llm", lambda settings: object())
 
@@ -161,24 +132,7 @@ def test_ask_question_uses_lower_cutoff_for_short_query(monkeypatch):
 
 def test_ask_question_retries_without_gate_when_first_query_has_no_sources(monkeypatch):
     captured = {"calls": []}
-
-    root_module = ModuleType("llama_index")
-    root_module.__path__ = []
-    core_module = ModuleType("llama_index.core")
-    core_module.__path__ = []
-    indices_module = ModuleType("llama_index.core.indices")
-    indices_module.__path__ = []
-    postprocessor_module = ModuleType("llama_index.core.indices.postprocessor")
-
-    class SimilarityPostprocessor:
-        def __init__(self, **kwargs):
-            self.__dict__.update(kwargs)
-
-    postprocessor_module.SimilarityPostprocessor = SimilarityPostprocessor
-    monkeypatch.setitem(sys.modules, "llama_index", root_module)
-    monkeypatch.setitem(sys.modules, "llama_index.core", core_module)
-    monkeypatch.setitem(sys.modules, "llama_index.core.indices", indices_module)
-    monkeypatch.setitem(sys.modules, "llama_index.core.indices.postprocessor", postprocessor_module)
+    _install_llama_index_mocks(monkeypatch)
 
     monkeypatch.setattr("fin_rag.qa.workflow.build_llm", lambda settings: object())
 

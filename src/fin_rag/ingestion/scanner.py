@@ -57,13 +57,19 @@ def _is_excluded(relative_path: Path, patterns: list[str]) -> bool:
         lower_pattern = pattern.lower()
         if fnmatch.fnmatch(lower_candidate, lower_pattern):
             return True
-        if lower_pattern.endswith("/**") and lower_candidate.startswith(lower_pattern[:-3]):
-            return True
-        if lower_pattern in lower_candidate and "*" in lower_pattern:
-            wildcard_pattern = lower_pattern.replace("**", "*")
-            if fnmatch.fnmatch(lower_candidate, wildcard_pattern):
+        if "**" in lower_pattern:
+            if _match_double_wildcard(lower_candidate, lower_pattern):
                 return True
     return False
+
+
+def _match_double_wildcard(candidate: str, pattern: str) -> bool:
+    prefix, _, suffix = pattern.partition("**")
+    if not candidate.startswith(prefix):
+        return False
+    if suffix and not candidate.endswith(suffix):
+        return False
+    return True
 
 
 def _sha1(path: Path) -> str:

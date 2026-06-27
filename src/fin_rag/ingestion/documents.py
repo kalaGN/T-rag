@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from fin_rag.config import Settings, SourceConfig
 from fin_rag.ingestion.readers import LoadedDocument, load_document
@@ -40,7 +41,7 @@ def collect_loaded_documents(settings: Settings, sources: list[SourceConfig]) ->
     return CollectedDocuments(documents=documents, scanned_files=scanned_files)
 
 
-def to_llama_documents(documents: list[LoadedDocument]) -> list[object]:
+def to_llama_documents(documents: list[LoadedDocument]) -> list[Any]:
     try:
         from llama_index.core import Document
     except ModuleNotFoundError as exc:

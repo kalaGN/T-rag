@@ -17,9 +17,14 @@ from fin_rag.web.app import serve_web
 
 
 def _configure_logging() -> None:
-    if logging.getLogger().handlers:
+    logger = logging.getLogger("fin_rag")
+    if logger.handlers:
         return
-    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
 
 
 def main() -> None:

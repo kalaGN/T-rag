@@ -89,7 +89,7 @@ ensure_embeddings() {
 
   EMBEDDING_LOG="$(mktemp -t fin-rag-embedding.XXXXXX.log)"
   echo "Starting embedding service in background"
-  SETTINGS_PATH="$SETTINGS_PATH" "$START_SCRIPT" embeddings >"$EMBEDDING_LOG" 2>&1 &
+  HF_HUB_OFFLINE=1 SETTINGS_PATH="$SETTINGS_PATH" "$START_SCRIPT" embeddings >"$EMBEDDING_LOG" 2>&1 &
   EMBEDDING_PID="$!"
 
   wait_for_http "$EMBEDDING_URL" "Embedding service"

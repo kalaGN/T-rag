@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass
+from typing import Any
 
 from fin_rag.config import Settings
 from fin_rag.store.runtime import build_docstore, build_embedding, build_qdrant_vector_store, persist_docstore
+
+_settings_lock = threading.Lock()
 
 
 @dataclass(slots=True)
@@ -14,7 +18,7 @@ class IndexExecutionResult:
     qdrant_url: str
 
 
-def run_llama_index(settings: Settings, documents: list[object]) -> IndexExecutionResult:
+def run_llama_index(settings: Settings, documents: list[Any]) -> IndexExecutionResult:
     IngestionPipeline, HierarchicalNodeParser = _load_ingestion_types()
     embed_model = build_embedding(settings)
     vector_store = _build_qdrant_vector_store(settings)
@@ -57,5 +61,6 @@ def _build_qdrant_vector_store(settings: Settings):
             "llama-index is not installed. Install project dependencies before running real indexing."
         ) from exc
 
-    LlamaSettings.embed_model = build_embedding(settings)
+    with _settings_lock:
+        LlamaSettings.embed_model = build_embedding(settings)
     return build_qdrant_vector_store(settings)

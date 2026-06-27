@@ -19,13 +19,19 @@ class SentenceTransformerEmbedder:
     _model: object = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
+        import os
+
+        # 默认离线加载，避免每次启动连接 huggingface.co 超时。
+        # 设置 HF_HUB_OFFLINE=1 可全局禁用网络请求；也可通过 FIN_RAG_HF_OFFLINE=0 恢复在线模式。
+        if os.environ.get("FIN_RAG_HF_OFFLINE", "1") not in ("0", "false", "no"):
+            os.environ.setdefault("HF_HUB_OFFLINE", "1")
         try:
             from sentence_transformers import SentenceTransformer
         except ModuleNotFoundError as exc:
             raise RuntimeError(
                 "sentence-transformers is not installed. Install dependencies before starting the embedding service."
             ) from exc
-        self._model = SentenceTransformer(self.model_name)
+        self._model = SentenceTransformer(self.model_name, local_files_only=True)
 
     def encode(self, texts: list[str]) -> list[list[float]]:
         embeddings = self._model.encode(texts, normalize_embeddings=True)
@@ -123,4 +129,12 @@ def build_embeddings_response(model: str, texts: list[str], vectors: list[list[f
 
 
 def estimate_token_count(text: str) -> int:
-    return max(1, len(text.strip()))
+    stripped = text.strip()
+    if not stripped:
+        return 0
+    import re
+
+    # 中文字符约 1-2 token/字，英文单词约 1-2 token/词
+    cjk_chars = len(re.findall(r"[一-鿿㐀-䶿]", stripped))
+    words = len(re.findall(r"[a-zA-Z0-9]+", stripped))
+    return max(1, cjk_chars + words)
