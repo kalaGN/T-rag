@@ -2,6 +2,18 @@
 
 本机单用户文档 RAG 系统，通过 Gradio 页面管理多个知识库并进行带引用问答，不提供独立业务 API。
 
+## 界面预览
+
+截图使用示例文档和本地演示模型，展示真实页面操作。
+
+**文档管理与索引重建**
+
+![文档管理与索引重建](docs/images/document-management.png)
+
+**带引用问答与原文预览**
+
+![带引用问答与原文预览](docs/images/citation-qa.png)
+
 ## 启动
 
 Python 3.11+，需要本地 Qdrant 和 Embedding 服务。
