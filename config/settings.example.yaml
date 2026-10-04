@@ -1,9 +1,8 @@
-app_name: fin-rag
-qdrant_collection: fin_rag_docs
+app_name: t-rag
+data_dir: data/t_rag
 qdrant_url: http://localhost:6333
-llm_base_url: https://api.deepseek.com
-llm_model: deepseek-v4-pro
-llm_api_key: ""
+llm_base_url: ""
+llm_model: ""
 llm_timeout: 30.0
 llm_max_tokens: 1024
 llm_temperature: 0.1
@@ -13,13 +12,7 @@ embedding_dim: 768
 embedding_batch_size: 8
 embedding_host: 127.0.0.1
 embedding_port: 8001
-chunk_sizes:
-  - 1024
-  - 512
-  - 256
+chunk_sizes: [512]
 chunk_overlap: 80
 similarity_cutoff: 0.45
 fusion_top_k: 8
-rerank_top_n: 6
-large_file_threshold_bytes: 1048576
-docstore_path: data/docstore

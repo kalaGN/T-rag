@@ -1,24 +1,3 @@
-sources:
-  - name: fin-online
-    root: /Users/wangfei/yulore/fin-online.dianhua.cn
-    include:
-      - docs
-      - .cursor
-    exclude_patterns:
-      - "*bxf*"
-      - "docs/testcase/**"
-      - "docs/review/**"
-      - ".DS_Store"
-      - "target/**"
-      - ".git/**"
-    default_domain: fin-online
-  - name: opdata
-    root: /Users/wangfei/yulore/opdata.dianhua.cn
-    include:
-      - docs
-      - .cursor
-    exclude_patterns:
-      - ".DS_Store"
-      - "target/**"
-      - ".git/**"
-    default_domain: opdata
+# 数据源在各知识库 manifest.json 中登记。
+# 使用页面，或 t-rag source add --kb ID --directory /absolute/path。
+sources: []

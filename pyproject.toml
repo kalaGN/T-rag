@@ -3,10 +3,10 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "fin-rag"
+name = "t-rag"
 version = "0.1.0"
-description = "Knowledge assistant for fin-online and opdata documents"
-readme = "docs/design/2026-06-24-fin-rag-design.md"
+description = "Local document knowledge bases with citation-based RAG"
+readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
   "fastapi>=0.115,<1",
@@ -30,10 +30,10 @@ dev = [
 ]
 
 [project.scripts]
-fin-rag = "fin_rag.cli:main"
+t-rag = "t_rag.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/fin_rag"]
+packages = ["src/t_rag"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

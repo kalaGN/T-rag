@@ -369,7 +369,7 @@ fin-rag/
 ├── config/
 │   ├── settings.yaml          # 模型/阈值/路径(无硬编码,全走配置)
 │   └── sources.yaml           # 多项目数据源清单(可扩展加项目)
-├── src/fin_rag/
+├── src/t_rag/
 │   ├── config.py              # Pydantic 配置加载+校验
 │   ├── llama_settings.py      # LlamaIndex Settings: LLM/Embedding/Callback
 │   ├── ingestion/             # ── LlamaIndex 数据管道

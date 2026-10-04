@@ -1,358 +1,82 @@
-# fin-rag 使用文档
+# t-rag 使用说明
 
-本文档只描述当前仓库已经落地、可直接执行的能力。
+## 1. 安装与配置
 
-## 1. 功能范围
-
-当前可用功能：
-
-- 扫描 `fin-online` 和 `opdata` 的 `docs/`、`.cursor/` 目录
-- 使用本地 `BAAI/bge-base-zh-v1.5` Embedding 服务建索引
-- 将向量库写入本地 Qdrant
-- 通过 `query` 命令做融合检索，返回命中的文档块和元数据
-- 通过 `ask` 命令走 CitationQueryEngine 做带引用问答
-- 通过 HTTP API 提供健康检查和问答接口
-- 通过 Gradio 页面提供最小可用问答入口
-
-当前未接入：
-
-- 问答历史/反馈持久化
-
-## 2. 环境准备
-
-### 2.1 依赖
-
-项目要求 Python 3.11+。
-
-推荐先创建虚拟环境并安装依赖：
+Python 3.11+：
 
 ```bash
 python3 -m venv .venv
-.venv/bin/pip install -e .[dev]
+.venv/bin/pip install -e '.[dev]'
+cp config/settings.example.yaml config/settings.yaml
 ```
 
-### 2.2 启动脚本
+设置 `llm_base_url`、`llm_model`，通过 `T_RAG_LLM_API_KEY` 提供密钥。所有 Settings 字段中支持的环境变量均以 `T_RAG_` 开头，优先于 YAML。旧 `FIN_RAG_*` 变量不再读取。
 
-一键开发脚本是 [scripts/dev.sh](/Users/wangfei/yulore/fin-rag/scripts/dev.sh)。
-它会自动检查并启动 Qdrant、后台拉起 embedding，然后前台启动 `web` 或 `api`。
+默认数据目录 `data/t_rag`，每个知识库包含 JSON 清单、上传副本、DocStore；Qdrant 集合名称为 `t_rag_<知识库ID>`。旧金融集合和 `data/docstore` 不被自动迁移或删除。
 
-默认启动完整开发环境并打开 Gradio：
+模型和切分配置只通过 YAML/环境变量编辑，不提供页面设置。Embedding 模型、地址、维度或切分改变后必须重建。没有配置文件时模块 CLI 使用默认设置；启动脚本回退至示例配置。
+
+## 2. 页面启动
 
 ```bash
-scripts/dev.sh
+scripts/dev.sh web
 ```
 
-启动 API 开发环境：
+开发脚本检查 Qdrant（默认 6333），需要时启动 Docker 容器，并后台启动本地 BGE Embedding（默认 8001），前台运行 Gradio（默认 7860）。Qdrant 容器退出脚本后仍保留；脚本自己启动的 Embedding 随脚本退出。
+
+只启动单个组件：
 
 ```bash
-scripts/dev.sh api --host 0.0.0.0 --port 8010
-```
-
-统一入口脚本是 [scripts/start.sh](/Users/wangfei/yulore/fin-rag/scripts/start.sh)。
-它只启动单个模式，不负责联动拉起依赖服务。
-
-仓库新增了统一入口脚本 [scripts/start.sh](/Users/wangfei/yulore/fin-rag/scripts/start.sh)。
-
-默认启动 Gradio 页面：
-
-```bash
-scripts/start.sh
-```
-
-常用示例：
-
-```bash
-scripts/start.sh api --host 0.0.0.0 --port 8010
 scripts/start.sh embeddings
-scripts/start.sh index
-scripts/start.sh ask "账期切换逻辑是什么"
+scripts/start.sh web --host 127.0.0.1 --port 7860
 ```
 
-可选环境变量：
+可通过 `PYTHON_BIN`、`SETTINGS_PATH` 设置 Python 和配置路径。默认只监听本机，本版没有账号认证。
 
-- `PYTHON_BIN`
-- `SETTINGS_PATH`
-- `SOURCES_PATH`
+页面流程：
 
-### 2.3 本地服务
+1. 在“知识库”创建名称，选择当前知识库。
+2. 在“文档与重建”上传文件或登记目录，配置包含子目录与排除规则。包含 `.` 表示整个目录。
+3. 点击“全量重建索引”，查看进度与结果。
+4. 在“问答”输入问题，查看答案和引用；展开来源片段并预览已登记文档。
+5. 更新同名上传文件、修改目录文件或移除数据源后，再手动重建。
+6. 删除知识库需勾选确认；清理应用数据和对应集合，目录原始文件保留。
 
-需要先启动两个本地服务：
+只有导入成功不会建索引。空知识库重建后可用但没有片段，问答会拒答。重建失败时请检查文档编码、Qdrant、Embedding，然后再次重建。
 
-- Qdrant，默认地址 `http://localhost:6333`
-- Embedding 服务，默认地址 `http://127.0.0.1:8001/v1`
+## 3. 支持格式
 
-Qdrant 可以通过 Docker 启动，Embedding 服务通过本仓库 CLI 启动。
+Markdown/MDC 保留 ATX 标题层级，MDC 去除 frontmatter；TXT 使用全文；可提取文字的 PDF 保留每页位置；CSV 和 XLSX 保留工作表/行范围。读取全部页面和行，不静默取前10页或10行。
 
-## 3. 配置
+输入文本使用 UTF-8；扫描 PDF 不支持 OCR，无法提取文字时报错。CSV/XLSX 按30行组织内容段，再按切分配置切块。只支持 `.md/.mdc/.txt/.pdf/.csv/.xlsx`。目录外符号链接不纳入数据源。
 
-默认配置文件：
+## 4. CLI
 
-- [config/settings.example.yaml](/Users/wangfei/yulore/fin-rag/config/settings.example.yaml)
-- [config/settings.yaml](/Users/wangfei/yulore/fin-rag/config/settings.yaml)
-- [config/sources.yaml](/Users/wangfei/yulore/fin-rag/config/sources.yaml)
-
-建议先复制 `config/settings.example.yaml` 为 `config/settings.yaml`，再填入本机的密钥和地址。
-
-常用配置项：
-
-- `qdrant_url`
-- `qdrant_collection`
-- `embedding_base_url`
-- `embedding_model`
-- `embedding_dim`
-- `embedding_batch_size`
-- `llm_base_url`
-- `llm_model`
-- `llm_api_key`
-- `llm_timeout`
-- `llm_max_tokens`
-- `llm_temperature`
-- `docstore_path`
-- `chunk_sizes`
-- `similarity_cutoff`
-- `fusion_top_k`
-
-环境变量优先级高于 `settings.yaml`。当前代码支持的核心覆盖项是这些配置对应的 `FIN_RAG_*` 变量。
-
-DeepSeek 推荐配置：
-
-- `llm_base_url: https://api.deepseek.com`
-- `llm_model: deepseek-v4-pro`
-- `FIN_RAG_LLM_API_KEY` 仅放在本地环境变量里，不要写进仓库
-
-## 4. 启动本地 Embedding 服务
-
-Embedding 服务默认监听 `127.0.0.1:8001`，暴露 OpenAI-compatible 接口：
-
-- `GET /v1/models`
-- `POST /v1/embeddings`
-
-启动命令：
+安装后可使用 `.venv/bin/t-rag`，或 `PYTHONPATH=src .venv/bin/python -m t_rag.cli`。
 
 ```bash
-PYTHONPATH=src .venv/bin/python -m fin_rag.cli serve-embeddings
+.venv/bin/t-rag kb create "产品文档" --settings config/settings.yaml
+.venv/bin/t-rag kb list --settings config/settings.yaml
+.venv/bin/t-rag source add --kb ID --directory /absolute/docs --include . --exclude '.git/**'
+.venv/bin/t-rag source upload --kb ID --file /absolute/manual.pdf
+.venv/bin/t-rag source list --kb ID
+.venv/bin/t-rag source remove --kb ID --id SOURCE_ID
+scripts/start.sh index --kb ID
+scripts/start.sh query --kb ID "文档说了什么" --strategy fusion
+scripts/start.sh ask --kb ID "文档说了什么"
+.venv/bin/t-rag kb delete ID --confirm
 ```
 
-如果需要覆盖配置：
+`ID` 与 `SOURCE_ID` 替换为实际返回标识。`index/query/ask` 必须指定 `--kb`，支持 `vector/bm25/fusion` 三种策略。索引/问答可用同一 `--settings` 指定配置。旧 `--domain`、`--sources`、`serve-api` 已移除。
 
-```bash
-PYTHONPATH=src .venv/bin/python -m fin_rag.cli serve-embeddings --settings path/to/settings.yaml
-```
+先停止页面再使用同一数据目录的 CLI；进程锁会拒绝第二个进程。测试可以使用不同 `T_RAG_DATA_DIR`。
 
-接口说明：
+## 5. 索引与回答边界
 
-- `GET /v1/models` 返回当前模型列表
-- `POST /v1/embeddings` 接收 `input`，支持字符串或字符串数组
+每个知识库一个集合，全量覆盖重建。重建前标记不可用，完成向量、DocStore 和来源校验后才标记可用；失败不保留旧版在线服务。应用重启将中断的重建标记失败。
 
-## 5. 启动 Qdrant
+来源和文件哈希、Embedding/切分签名在查询前校验，变化时要求重建。重复重建不会累积片段，移除来源后重建不再检索其内容。
 
-默认 Qdrant 地址是 `http://localhost:6333`。
+向量检索用原始相似度门槛，BM25 用中文字符/双字及英文词项，融合采用 RRF 排序。编号引用必须存在且有效；无来源不调用 LLM，无引用或越界引用拒答。引用校验不证明答案事实全部正确，需核对原文。
 
-可用 Docker 启动后，再检查健康状态：
-
-```bash
-curl http://localhost:6333/healthz
-```
-
-如果返回 `healthz check passed`，说明服务可用。
-
-## 6. 建索引
-
-`index` 命令会：
-
-- 扫描数据源
-- 解析文档
-- 层级切分
-- 调用本地 Embedding 服务生成向量
-- 写入 Qdrant
-- 持久化 DocStore
-
-执行命令：
-
-```bash
-PYTHONPATH=src .venv/bin/python -m fin_rag.cli index
-```
-
-只做扫描统计，不写库：
-
-```bash
-PYTHONPATH=src .venv/bin/python -m fin_rag.cli index --dry-run
-```
-
-自定义配置文件：
-
-```bash
-PYTHONPATH=src .venv/bin/python -m fin_rag.cli index --settings path/to/settings.yaml
-```
-
-自定义数据源清单：
-
-```bash
-PYTHONPATH=src .venv/bin/python -m fin_rag.cli index --sources path/to/sources.yaml
-```
-
-索引完成后，命令会输出类似信息：
-
-```json
-{
-  "document_count": 233,
-  "node_count": 6271,
-  "collection_name": "fin_rag_docs",
-  "qdrant_url": "http://localhost:6333"
-}
-```
-
-## 7. 查询
-
-`query` 命令当前返回的是检索结果，不是最终 LLM 答案。
-
-执行命令：
-
-```bash
-PYTHONPATH=src .venv/bin/python -m fin_rag.cli query "账期切换逻辑是什么"
-```
-
-可选 domain 过滤：
-
-```bash
-PYTHONPATH=src .venv/bin/python -m fin_rag.cli query "账期切换逻辑是什么" --domain fin-online
-```
-
-`--domain` 可以重复传入：
-
-```bash
-PYTHONPATH=src .venv/bin/python -m fin_rag.cli query "账期切换逻辑是什么" --domain fin-online --domain opdata
-```
-
-输出格式为 JSON 数组，每一项包含：
-
-- `score`
-- `text`
-- `metadata`
-
-## 8. 问答
-
-`ask` 命令会走 CitationQueryEngine，并在返回前做引用/产品号校验；校验失败时会拒答。
-当前仓库已经接好入口，但需要你在 `settings.yaml` 或环境变量里配置一个 OpenAI-compatible LLM 服务。
-
-执行命令：
-
-```bash
-PYTHONPATH=src .venv/bin/python -m fin_rag.cli ask "账期切换逻辑是什么"
-```
-
-可选 domain 过滤：
-
-```bash
-PYTHONPATH=src .venv/bin/python -m fin_rag.cli ask "账期切换逻辑是什么" --domain fin-online
-```
-
-如果没有配置 `llm_base_url`，命令会直接报错退出。
-
-## 9. 数据源目录
-
-当前默认索引两个仓库：
-
-- `fin-online`
-- `opdata`
-
-对应路径在 `config/sources.yaml` 中配置。默认只索引：
-
-- `docs/`
-- `.cursor/`
-
-已排除内容：
-
-- `*bxf*`
-- `docs/testcase/**`
-- `docs/review/**`
-- `.DS_Store`
-- `target/**`
-- `.git/**`
-
-## 10. HTTP API
-
-启动命令：
-
-```bash
-PYTHONPATH=src .venv/bin/python -m fin_rag.cli serve-api
-```
-
-自定义监听地址：
-
-```bash
-PYTHONPATH=src .venv/bin/python -m fin_rag.cli serve-api --host 0.0.0.0 --port 8010
-```
-
-当前接口：
-
-- `GET /healthz`
-- `POST /ask`
-
-`POST /ask` 请求示例：
-
-```json
-{
-  "question": "账期切换逻辑是什么",
-  "domains": ["fin-online"]
-}
-```
-
-返回字段与 CLI `ask` 一致：
-
-- `answer`
-- `sources`
-- `refused`
-- `validation`
-
-## 11. Gradio 页面
-
-启动命令：
-
-```bash
-PYTHONPATH=src .venv/bin/python -m fin_rag.cli serve-web
-```
-
-自定义监听地址：
-
-```bash
-PYTHONPATH=src .venv/bin/python -m fin_rag.cli serve-web --host 0.0.0.0 --port 7860
-```
-
-页面当前提供：
-
-- 问题输入
-- `fin-online` / `opdata` 业务域过滤
-- 回答、来源、校验结果展示
-
-## 12. 常见问题
-
-### 12.1 `query` 报错找不到 collection
-
-先重新执行 `index`。
-
-### 12.2 `index` 能跑完，但 `node_count` 为 0
-
-通常表示没有生成 embedding 或没有把节点写进 Qdrant。先确认：
-
-- 本地 Embedding 服务已启动
-- `embedding_base_url` 配置正确
-- Qdrant 服务可访问
-
-### 12.3 `query` 没有返回结果
-
-先检查：
-
-- 传入的问题是否落在当前索引范围内
-- `--domain` 是否过滤过窄
-- `index` 是否刚刚成功写入
-
-## 13. 建议的运行顺序
-
-```bash
-1. 启动 Qdrant
-2. 启动 embedding 服务
-3. 配置 LLM 服务
-4. 执行 index
-5. 执行 query 或 ask
-```
+不支持增量同步、版本发布、后台任务恢复、OCR、网页抓取、数据库查询、多轮会话或流式生成。

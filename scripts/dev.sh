@@ -99,21 +99,26 @@ ensure_embeddings() {
 
 run_target() {
   case "$MODE" in
-    web|api)
+    web)
       SETTINGS_PATH="$SETTINGS_PATH" "$START_SCRIPT" "$MODE" "$@"
       ;;
     *)
       cat <<'EOF' >&2
-Usage: scripts/dev.sh [web|api] [args...]
+Usage: scripts/dev.sh [web] [args...]
 
 Examples:
   scripts/dev.sh
-  scripts/dev.sh api --host 0.0.0.0 --port 8010
+  scripts/dev.sh web --host 127.0.0.1 --port 7860
 EOF
       exit 1
       ;;
   esac
 }
+
+if [[ "$MODE" != "web" ]]; then
+  echo "Usage: scripts/dev.sh [web] [args...]" >&2
+  exit 1
+fi
 
 cd "$ROOT_DIR"
 ensure_qdrant

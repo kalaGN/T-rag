@@ -5,7 +5,9 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PYTHON_BIN="${PYTHON_BIN:-$ROOT_DIR/.venv/bin/python}"
 SETTINGS_PATH="${SETTINGS_PATH:-$ROOT_DIR/config/settings.yaml}"
-SOURCES_PATH="${SOURCES_PATH:-$ROOT_DIR/config/sources.yaml}"
+if [[ ! -f "$SETTINGS_PATH" ]]; then
+  SETTINGS_PATH="$ROOT_DIR/config/settings.example.yaml"
+fi
 
 if [[ ! -x "$PYTHON_BIN" ]]; then
   echo "Python not found: $PYTHON_BIN" >&2
@@ -19,33 +21,29 @@ cd "$ROOT_DIR"
 
 case "$MODE" in
   web)
-    PYTHONPATH=src "$PYTHON_BIN" -m fin_rag.cli serve-web --settings "$SETTINGS_PATH" "$@"
-    ;;
-  api)
-    PYTHONPATH=src "$PYTHON_BIN" -m fin_rag.cli serve-api --settings "$SETTINGS_PATH" "$@"
+    PYTHONPATH=src "$PYTHON_BIN" -m t_rag.cli serve-web --settings "$SETTINGS_PATH" "$@"
     ;;
   embeddings)
-    PYTHONPATH=src "$PYTHON_BIN" -m fin_rag.cli serve-embeddings --settings "$SETTINGS_PATH" "$@"
+    PYTHONPATH=src "$PYTHON_BIN" -m t_rag.cli serve-embeddings --settings "$SETTINGS_PATH" "$@"
     ;;
   index)
-    PYTHONPATH=src "$PYTHON_BIN" -m fin_rag.cli index --settings "$SETTINGS_PATH" --sources "$SOURCES_PATH" "$@"
+    PYTHONPATH=src "$PYTHON_BIN" -m t_rag.cli index --settings "$SETTINGS_PATH" "$@"
     ;;
   query)
-    PYTHONPATH=src "$PYTHON_BIN" -m fin_rag.cli query "$@"
+    PYTHONPATH=src "$PYTHON_BIN" -m t_rag.cli query --settings "$SETTINGS_PATH" "$@"
     ;;
   ask)
-    PYTHONPATH=src "$PYTHON_BIN" -m fin_rag.cli ask "$@"
+    PYTHONPATH=src "$PYTHON_BIN" -m t_rag.cli ask --settings "$SETTINGS_PATH" "$@"
     ;;
   *)
     cat <<'EOF' >&2
-Usage: scripts/start.sh [web|api|embeddings|index|query|ask] [args...]
+Usage: scripts/start.sh [web|embeddings|index|query|ask] [args...]
 
 Examples:
   scripts/start.sh
-  scripts/start.sh api --host 0.0.0.0 --port 8010
   scripts/start.sh embeddings
-  scripts/start.sh index
-  scripts/start.sh ask "账期切换逻辑是什么"
+  scripts/start.sh index --kb ID
+  scripts/start.sh ask --kb ID "问题"
 EOF
     exit 1
     ;;
